@@ -54,10 +54,10 @@ class cleardata:
         print('Clear Telia Play completed')
 
     def set_setting(self, key, value):
-        return xbmcaddon.Addon('plugin.video.teliaplay').setSetting(key, value)
+        return xbmcaddon.Addon('plugin.video.teliaplay-boirello').setSetting(key, value)
 
     def reset_login(self):
-        localized = xbmcaddon.Addon('plugin.video.teliaplay').getLocalizedString
+        localized = xbmcaddon.Addon('plugin.video.teliaplay-boirello').getLocalizedString
         self.set_setting('teliaplay_subtoken', '')
         self.set_setting('teliaplay_timestamp', '')
         self.set_setting('teliaplay_tv_client_boot_id', '')
