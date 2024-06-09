@@ -64,13 +64,14 @@ import re
 import six
 import time
 import uuid
+import traceback
 
 from ext import c_ext_info
 
 base_url = sys.argv[0]
 addon_handle = int(sys.argv[1])
 params = dict(urlparse.parse_qsl(sys.argv[2][1:]))
-addon = xbmcaddon.Addon(id='plugin.video.teliaplay')
+addon = xbmcaddon.Addon(id='plugin.video.teliaplay-boirello')
 
 exlink = params.get('url', '')
 extitle = params.get('title', '')
@@ -106,6 +107,8 @@ search_icon = os.path.join(icons, 'search.png')
 lock_icon = os.path.join(icons, 'lock.png')
 settings_icon = os.path.join(icons, 'settings.png')
 
+USER_AGENT = 'Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:91.0) Gecko/20100101 Firefox/91.0'
+
 catchup_msg = addon.getSetting('teliaplay_play_beginning')
 if catchup_msg == 'true':
     play_beginning = True
@@ -117,12 +120,14 @@ password = addon.getSetting('teliaplay_password').strip()
 
 country = int(addon.getSetting('teliaplay_locale'))
 
-base = ['https://teliatv.dk', 'https://www.teliaplay.se']
-referer = ['https://teliatv.dk/', 'https://www.teliaplay.se/']
-host = ['www.teliatv.dk', 'www.teliaplay.se']
+base = ['https://teliatv.dk', 'https://www.teliaplay.se', 'https://www.teliaplay.no']
+referer = ['https://teliatv.dk/', 'https://www.teliaplay.se/', 'https://www.teliaplay.no/']
+host = ['www.teliatv.dk', 'www.teliaplay.se', 'www.teliaplay.no']
 
-cc = ['dk', 'se']
-ca = ['DK', 'SE']
+cc = ['dk', 'se', 'no']
+ca = ['DK', 'SE', 'NO']
+cl = ['da', 'sv-se', 'nb-no']
+city = ['Copenhagen', 'Stockholm', 'Oslo']
 
 sess = requests.Session()
 timeouts = (5, 5)
@@ -193,23 +198,29 @@ def send_req(url, post=False, json=None, headers=None, data=None, params=None, c
             response = sess.get(url, headers=headers, json=json, data=data, params=params, cookies=cookies, verify=verify, allow_redirects=allow_redirects, timeout=timeout)
 
     except HTTPError as e:
-        print('HTTPError: {}'.format(str(e)))
+        #print('HTTPError: {}'.format(str(e)))
+        xbmc.log('HTTPError: {}'.format(str(e)), level=xbmc.LOGINFO)
         response = False
 
     except ConnectionError as e:
-        print('ConnectionError: {}'.format(str(e)))
+        #print('ConnectionError: {}'.format(str(e)))
+        xbmc.log('ConnectionError: {}'.format(str(e)), level=xbmc.LOGINFO)
         response = False
 
     except Timeout as e:
-        print('Timeout: {}'.format(str(e))) 
+        #print('Timeout: {}'.format(str(e)))
+        xbmc.log('Timeout: {}'.format(str(e)), level=xbmc.LOGINFO)
         response = False
 
     except RequestException as e:
-        print('RequestException: {}'.format(str(e))) 
+        #print('RequestException: {}'.format(str(e)))
+        xbmc.log('RequestException: {}'.format(str(e)), level=xbmc.LOGINFO)
         response = False
 
     except:
-        xbmcgui.Dialog().notification(localized(30012), localized(30006))
+        errormsg = traceback.format_exc()
+        xbmc.log('ERROR: {}'.format(errormsg), level=xbmc.LOGINFO)
+        xbmcgui.Dialog().ok(localized(30012), localized(30006))
         response = False
 
     return response
@@ -281,7 +292,7 @@ def login_service():
             except:
                 pass
 
-            create_data()
+            #create_data()
             login = login_data(reconnect=False)
 
         else:
@@ -290,12 +301,18 @@ def login_service():
         return login
 
     except Exception as ex:
-        print('login_service exception: {}'.format(ex))
+        errormsg = traceback.format_exc()
+        xbmc.log('ERROR: {}\n{}'.format(ex, errormsg), level=xbmc.LOGINFO)
         addon.setSetting('teliaplay_devush', '')
-        xbmcgui.Dialog().notification(localized(30012), localized(30006))
+        xbmcgui.Dialog().ok(localized(30012), localized(30006))
     return False
 
 def login_data(reconnect, retry=0):
+    # Login for Norway:
+    if cc[country] == "no":
+        return login_norway(reconnect, retry=0)
+    
+    # Login for other countries:
     dashjs, tv_client_boot_id, timestamp, sessionid = create_data()
 
     try:
@@ -308,7 +325,7 @@ def login_data(reconnect, retry=0):
             'accept': '*/*',
             'origin': base[country],
             'referer': referer[country],
-            'accept-language': 'en-US,en;q=0.9',
+            'accept-language': '{cl},en;q=0.9'.format(cl=cl[country]),
         }
 
         data = {
@@ -343,7 +360,7 @@ def login_data(reconnect, retry=0):
 
         headers = {
             'accept': '*/*',
-            'accept-language': 'sv,en;q=0.9,en-GB;q=0.8,en-US;q=0.7,pl;q=0.6,fr;q=0.5',
+            'accept-language': '{cc},en;q=0.9,{cl};q=0.8,en-US;q=0.7'.format(cc=cc[country], cl=cl[country]),
             'dnt': '1',
             'origin': 'https://login.teliaplay.{cc}'.format(cc=cc[country]),
             'referer': 'https://login.teliaplay.{cc}/'.format(cc=cc[country]),
@@ -377,7 +394,7 @@ def login_data(reconnect, retry=0):
         url = 'https://logingateway-telia.clientapi-prod.live.tv.telia.net/logingateway/rest/v1/oauth/token'
 
         headers = {
-            'accept-language': 'sv,en;q=0.9,en-GB;q=0.8,en-US;q=0.7,pl;q=0.6,fr;q=0.5',
+            'accept-language': '{cc},en;q=0.9,{cl};q=0.8,en-US;q=0.7'.format(cc=cc[country], cl=cl[country]),
             'dnt': '1',
             'origin': base[country],
             'referer': referer[country],
@@ -433,7 +450,7 @@ def login_data(reconnect, retry=0):
             'sec-GPC': '1',
             'origin': base[country],
             'referer': referer[country],
-            'accept-language': 'en-US,en;q=0.9',
+            'accept-language': '{cl},en;q=0.9'.format(cl=cl[country]),
         }
 
         data = {
@@ -501,7 +518,7 @@ def login_data(reconnect, retry=0):
         headers = {
             'user-agent': UA,
             'accept': '*/*',
-            'accept-language': "sv,en;q=0.9,en-GB;q=0.8,en-US;q=0.7,pl;q=0.6",
+            'accept-language': '{cc},en;q=0.9,{cl};q=0.8,en-US;q=0.7'.format(cc=cc[country], cl=cl[country]),
             'authorization': 'Bearer ' + beartoken,
             'tv-client-boot-id': tv_client_boot_id,
         }
@@ -526,9 +543,125 @@ def login_data(reconnect, retry=0):
         return True
 
     except Exception as ex:
-        print('login_data exception: {}'.format(ex))
+        errormsg = traceback.format_exc()
+        xbmc.log('login_data exception: {}\n{}'.format(ex, errormsg), level=xbmc.LOGINFO)
 
     return False
+
+def login_norway(reconnect, retry=0):
+    device_id, tv_client_boot_id, timestamp, sessionid = create_data()
+    try:
+        # 1)
+        url = "https://logingateway.teliaplay.{cc}/logingateway/rest/v1/get-login/authenticate".format(cc=cc[country])
+        headers = {
+            "user-agent":           USER_AGENT,
+            #"tv-client-boot-id":    tv_client_boot_id,
+            'accept':               'application/json',
+            'content-type':         'application/json',
+            'x-country':            ca[country],
+        }
+        params = {
+            'redirectUri': 'https://www.teliaplay.{cc}/'.format(cc=cc[country]),
+        }
+        payload = {
+            'deviceId':             device_id,
+            'username':             login,
+            'password':             password,
+            'deviceType':           'WEB',
+            'whiteLabelBrand':      'TELIA',
+        }
+        response = send_req(url, post=True, headers=headers, params=params, json=payload, verify=True)
+        if not response:
+            xbmcgui.Dialog().ok(localized(30012), "%s (1)" % localized(30006))
+            return False
+        response = response.json()
+        if 'errorMessage' in response.keys():
+            msg = localized(30007)
+            if 'Username/password was incorrect' in response['errorMessage']:
+                msg = "%s: %s/%s %s" % (msg, localized(30002), localized(30003), localized(30015).lower())
+            else:
+                msg = "%s: %s" % (msg, response['errorMessage'])
+            xbmcgui.Dialog().ok(localized(30012), msg)
+            return False
+        elif "idToken" not in response.keys() or "engagements" not in response.keys() or "engagementId" not in response["engagements"][0].keys():
+            xbmcgui.Dialog().ok(localized(30012), "%s: Unexpected response!\nURL: '%s'\nResponse: %s" % (localized(30007), url, response))
+            return False
+        
+        idToken = response["idToken"]
+        engagement_id = response["engagements"][0]["engagementId"]
+        
+        # 2)
+        url = 'https://logingateway.teliaplay.{cc}/logingateway/rest/v1/get-login/authenticate/selected'.format(cc=cc[country])
+        headers = {
+            'user-agent':           USER_AGENT,
+            'accept':               'application/json',
+            'content-type':         'application/json',
+            'tv-client-boot-id':    tv_client_boot_id,
+            'tv-client-name':       'web',
+            'x-country':            ca[country],
+        }
+        params = {
+            'redirectUri': 'https://www.teliaplay.{cc}/'.format(cc=cc[country]),
+        }
+        engagementIdentifierDto = {"country":"NO", "id":engagement_id, "platform":"OTT"}
+        payload = {
+            'engagementIdentifier': engagementIdentifierDto,
+            'token':                idToken,
+        }
+        response = send_req(url, post=True, headers=headers, params=params, json=payload, verify=True)
+        if not response:
+            xbmcgui.Dialog().ok(localized(30012), "%s (2)" % localized(30006))
+            return False
+        response = response.json()
+        if 'errorMessage' in response.keys():
+            msg = "%s: %s" % (localized(30007), response['errorMessage'])
+            xbmcgui.Dialog().ok(localized(30012), msg)
+            return False
+        elif "redirectUri" not in response.keys() or "teliaplay.{cc}/?code=".format(cc=cc[country]) not in response["redirectUri"]:
+            xbmcgui.Dialog().ok(localized(30012), "%s: Unexpected response!\nURL: '%s'\nResponse: %s" % (localized(30007), url, response))
+            return False
+        
+        code = response["redirectUri"].split("/?code=")[1]
+        
+        # 3)
+        url = 'https://logingateway.teliaplay.{cc}/logingateway/rest/v1/oauth/token?code={code}'.format(cc=cc[country], code=code)
+        headers = {
+            'user-agent':           USER_AGENT,
+            'accept':               'application/json',
+            'content-type':         'application/json',
+            'tv-client-boot-id':    tv_client_boot_id,
+            'tv-client-name':       'web',
+            'x-country':            ca[country],
+        }
+        response = send_req(url, post=True, headers=headers, verify=True)
+        if not response:
+            xbmcgui.Dialog().ok(localized(30012), "%s (3)" % localized(30006))
+            return False
+        response = response.json()
+        if 'errorMessage' in response.keys():
+            msg = "%s: %s" % (localized(30007), response['errorMessage'])
+            xbmcgui.Dialog().ok(localized(30012), msg)
+            return False
+        
+        validTo = response.get('validTo', '')
+        addon.setSetting('teliaplay_validto', str(validTo))
+
+        beartoken = response.get('accessToken', '')
+        addon.setSetting('teliaplay_beartoken', str(beartoken))
+
+        refrtoken = response.get('refreshToken', '')
+        addon.setSetting('teliaplay_refrtoken', str(refrtoken))
+        
+        # TODO: What is the following settings variables for?
+        # 'teliaplay_cookies', 'teliaplay_usern', 'teliaplay_subtoken'
+        return True
+    
+    except Exception as ex:
+        errormsg = traceback.format_exc()
+        xbmc.log('login_norway exception: {}\n{}'.format(ex, errormsg), level=xbmc.LOGINFO)
+        xbmcgui.Dialog().ok(localized(30012), 'login_norway exception: {}'.format(ex))
+    return False
+
 
 def video_on_demand():
     login = check_login()
@@ -920,7 +1053,7 @@ def get_items(data, mode=None, thumb=thumb, poster=poster, banner=banner, clearl
                     poster = fanart
 
             ext = localized(30027)
-            context_menu = [('{0}'.format(ext), 'RunScript(plugin.video.teliaplay,0,?mode=ext,label={0})'.format(title))]
+            context_menu = [('{0}'.format(ext), 'RunScript(plugin.video.teliaplay-boirello,0,?mode=ext,label={0})'.format(title))]
 
             #xbmcplugin.addSortMethod(addon_handle, sortMethod=xbmcplugin.SORT_METHOD_TITLE, label2Mask = "%R, %Y, %P")
 
@@ -1112,7 +1245,7 @@ def vod_episodes(season, season_id):
                         poster = fanart
 
                 ext = localized(30027)
-                context_menu = [('{0}'.format(ext), 'RunScript(plugin.video.teliaplay,0,?mode=ext,label={0})'.format(label))]
+                context_menu = [('{0}'.format(ext), 'RunScript(plugin.video.teliaplay-boirello,0,?mode=ext,label={0})'.format(label))]
 
                 add_item(label=label, url='vod', mode='play', media_id=media_id, folder=False, playable=True, info_labels={'title': title, 'sorttitle': title, 'originaltitle': title, 'plot': plot, 'genre': genre, 'director': directors, 'cast': actors_lst, 'sortepisode': episode_nr, 'sortseason': season_nr, 'mpaa': age, 'year': date}, icon=icon, poster=poster, fanart=fanart, context_menu=context_menu, item_count=count)
 
@@ -1418,7 +1551,7 @@ def now_playing(thumb=thumb, poster=poster, banner=banner, clearlogo=clearlogo, 
                         catchup = 'LIVE'
 
                         ext = localized(30027)
-                        context_menu = [('{0}'.format(ext), 'RunScript(plugin.video.teliaplay,0,?mode=ext,label={0})'.format(label))]
+                        context_menu = [('{0}'.format(ext), 'RunScript(plugin.video.teliaplay-boirello,0,?mode=ext,label={0})'.format(label))]
 
                         add_item(label=label, url=exlink, mode='play', media_id=media_id, catchup=catchup, start=start_time, end=end_time, folder=False, playable=True, info_labels={'title': title, 'sorttitle': title, 'originaltitle': title, 'plot': plot, 'plotoutline': outline, 'aired': today, 'dateadded': today, 'duration': duration, 'sortepisode': episode_nr, 'sortseason': season_nr}, icon=icon, poster=poster, fanart=fanart, context_menu=context_menu, item_count=count)
 
@@ -1440,12 +1573,13 @@ def live_channels():
     tv_client_boot_id = addon.getSetting('teliaplay_tv_client_boot_id')
 
     try:
+        # TODO: Must be changed for Norway..?
         url = 'https://ottapi.prod.telia.net/web/{cc}/engagementgateway/rest/secure/v2/engagementinfo'.format(cc=cc[country])
 
         headers = {
             "user-agent": UA,
             "accept": "*/*",
-            "accept-language": "sv,en;q=0.9,en-GB;q=0.8,en-US;q=0.7,pl;q=0.6",
+            "accept-language": "{cc},en;q=0.9,{cl};q=0.8,en-US;q=0.7".format(cc=cc[country], cl=cl[country]),
             "authorization": "Bearer " + beartoken,
         }
 
@@ -1478,7 +1612,7 @@ def live_channels():
         headers = {
             'authority': 'graphql-telia.t6a.net',
             'accept': '*/*',
-            'accept-language': 'sv,en;q=0.9,en-GB;q=0.8,en-US;q=0.7,pl;q=0.6,fr;q=0.5',
+            'accept-language': '{cc},en;q=0.9,{cl};q=0.8,en-US;q=0.7'.format(cc=cc[country], cl=cl[country]),
             'authorization': 'Bearer ' + beartoken,
             'content-type': 'application/json',
             'dnt': '1',
@@ -1490,7 +1624,7 @@ def live_channels():
             'tv-client-name': 'web',
             'tv-client-os-name': 'Windows',
             'tv-client-os-version': 'NT 10.0',
-            'tv-client-tz': 'Europe/Stockholm',
+            'tv-client-tz': 'Europe/{city}'.format(city=city[country]),
             'tv-client-version': '1.43.2',
             'user-agent': UA,
             'x-country': ca[country],
@@ -1789,7 +1923,7 @@ def live_channel(exlink, extitle):
                 poster = fanart
 
             ext = localized(30027)
-            context_menu = [('{0}'.format(ext), 'RunScript(plugin.video.teliaplay,0,?mode=ext,label={0})'.format(label))]
+            context_menu = [('{0}'.format(ext), 'RunScript(plugin.video.teliaplay-boirello,0,?mode=ext,label={0})'.format(label))]
 
             add_item(label=label, url=exlink, mode='play', media_id=media_id, catchup=catchup, start=start_time, end=end_time, folder=False, playable=True, info_labels={'title': title, 'sorttitle': title, 'originaltitle': org_title, 'plot': plot, 'plotoutline': plot, 'aired': aired, 'dateadded': date, 'duration': duration, 'genre': genre, 'country': lang}, icon=icon, poster=poster, fanart=fanart, context_menu=context_menu, item_count=count)
 
@@ -1817,14 +1951,14 @@ def get_stream(exlink, catchup_type):
                 'tv-client-boot-id': tv_client_boot_id,
                 'DNT': '1',
                 'authorization': 'Bearer '+ beartoken,
-                'tv-client-tz': 'Europe/Stockholm',
+                'tv-client-tz': 'Europe/{city}'.format(city=city[country]),
                 'x-country': cc[country],
                 'user-agent': UA,
                 'content-type': 'application/json',
                 'accept': '*/*',
                 'origin': base[country],
                 'referer': base[country]+'/',
-                'accept-language': 'sv,en;q=0.9,en-GB;q=0.8,en-US;q=0.7,pl;q=0.6',
+                'accept-language': '{cc},en;q=0.9,{cl};q=0.8,en-US;q=0.7'.format(cc=cc[country], cl=cl[country]),
             }
 
             params = (
@@ -1866,14 +2000,14 @@ def get_stream(exlink, catchup_type):
                 'tv-client-boot-id': tv_client_boot_id,
                 'DNT': '1',
                 'Authorization': 'Bearer '+ beartoken,
-                'tv-client-tz': 'Europe/Stockholm',
+                'tv-client-tz': 'Europe/{city}'.format(city=city[country]),
                 'X-Country': cc[country],
                 'User-Agent': UA,
                 'content-type': 'application/json',
                 'Accept': '*/*',
                 'Origin': base[country],
                 'Referer': base[country]+'/',
-                'Accept-Language': 'sv,en;q=0.9,en-GB;q=0.8,en-US;q=0.7,pl;q=0.6',
+                'accept-language': '{cc},en;q=0.9,{cl};q=0.8,en-US;q=0.7'.format(cc=cc[country], cl=cl[country]),
             }
 
             params = (
@@ -2446,7 +2580,7 @@ def play(exlink, title, media_id, catchup_type, start, end):
         play_item.setMimeType('application/xml+dash')
         play_item.setProperty('inputstream.adaptive.license_type', DRM)
         play_item.setProperty('inputstream.adaptive.license_key', license_url)
-        play_item.setProperty('inputstream.adaptive.stream_headers', 'Referer: https://www.teliaplay.se/&User-Agent=' + quote(UA))
+        play_item.setProperty('inputstream.adaptive.stream_headers', 'Referer: https://www.teliaplay.{}/&User-Agent={}'.format(cc[country], quote(UA)))
         play_item.setProperty('inputstream.adaptive.manifest_type', 'mpd')
         play_item.setProperty('IsPlayable', 'true')
         if catchup_type != 'LIVE':
@@ -2516,7 +2650,7 @@ def profile_data():
     headers = {
         'authority': 'graphql-telia.t6a.net',
         'accept': '*/*',
-        'accept-language': 'sv,en;q=0.9,en-GB;q=0.8,en-US;q=0.7,pl;q=0.6,fr;q=0.5',
+        'accept-language': '{cc},en;q=0.9,{cl};q=0.8,en-US;q=0.7'.format(cc=cc[country], cl=cl[country]),
         'authorization': 'Bearer ' + beartoken,
         'content-type': 'application/json',
         'dnt': '1',
@@ -2528,7 +2662,7 @@ def profile_data():
         'tv-client-name': 'web',
         'tv-client-os-name': 'Windows',
         'tv-client-os-version': 'NT 10.0',
-        'tv-client-tz': 'Europe/Stockholm',
+        'tv-client-tz': 'Europe/{city}'.format(city=city[country]),
         'tv-client-version': '1.46.0',
         'user-agent': UA,
         'x-country': ca[country],
@@ -2606,7 +2740,7 @@ def build_m3u():
     items = live_channels()
     for item in items:
         cid = item[0]
-        url = 'plugin://plugin.video.teliaplay/?title=&mode=play&url={cid}'.format(cid=cid)
+        url = 'plugin://plugin.video.teliaplay-boirello/?title=&mode=play&url={cid}'.format(cid=cid)
 
         tvg_id = item[1].lower().replace(' ', '_') + '.' + cc[country]
         title = item[1] + ' ' + ca[country]
