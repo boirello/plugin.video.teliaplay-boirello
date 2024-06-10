@@ -107,6 +107,7 @@ search_icon = os.path.join(icons, 'search.png')
 lock_icon = os.path.join(icons, 'lock.png')
 settings_icon = os.path.join(icons, 'settings.png')
 
+# If UA is version 91, the norwegian login does not work. But with version 116 it actually works:
 USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/116.0'
 
 catchup_msg = addon.getSetting('teliaplay_play_beginning')
