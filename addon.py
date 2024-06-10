@@ -107,7 +107,7 @@ search_icon = os.path.join(icons, 'search.png')
 lock_icon = os.path.join(icons, 'lock.png')
 settings_icon = os.path.join(icons, 'settings.png')
 
-USER_AGENT = 'Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:91.0) Gecko/20100101 Firefox/91.0'
+USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/116.0'
 
 catchup_msg = addon.getSetting('teliaplay_play_beginning')
 if catchup_msg == 'true':
@@ -198,28 +198,24 @@ def send_req(url, post=False, json=None, headers=None, data=None, params=None, c
             response = sess.get(url, headers=headers, json=json, data=data, params=params, cookies=cookies, verify=verify, allow_redirects=allow_redirects, timeout=timeout)
 
     except HTTPError as e:
-        #print('HTTPError: {}'.format(str(e)))
-        xbmc.log('HTTPError: {}'.format(str(e)), level=xbmc.LOGINFO)
+        xbmc.log('HTTPError: %s' % e, level=xbmc.LOGERROR)
         response = False
 
     except ConnectionError as e:
-        #print('ConnectionError: {}'.format(str(e)))
-        xbmc.log('ConnectionError: {}'.format(str(e)), level=xbmc.LOGINFO)
+        xbmc.log('ConnectionError: %s' % e, level=xbmc.LOGERROR)
         response = False
 
     except Timeout as e:
-        #print('Timeout: {}'.format(str(e)))
-        xbmc.log('Timeout: {}'.format(str(e)), level=xbmc.LOGINFO)
+        xbmc.log('Timeout: %s' % e, level=xbmc.LOGERROR)
         response = False
 
     except RequestException as e:
-        #print('RequestException: {}'.format(str(e)))
-        xbmc.log('RequestException: {}'.format(str(e)), level=xbmc.LOGINFO)
+        xbmc.log('RequestException: %s' % e, level=xbmc.LOGERROR)
         response = False
 
     except:
         errormsg = traceback.format_exc()
-        xbmc.log('ERROR: {}'.format(errormsg), level=xbmc.LOGINFO)
+        xbmc.log('ERROR: %s' % errormsg, level=xbmc.LOGERROR)
         xbmcgui.Dialog().ok(localized(30012), localized(30006))
         response = False
 
@@ -310,7 +306,7 @@ def login_service():
 def login_data(reconnect, retry=0):
     # Login for Norway:
     if cc[country] == "no":
-        return login_norway(reconnect, retry=0)
+        return login_norway()
     
     # Login for other countries:
     dashjs, tv_client_boot_id, timestamp, sessionid = create_data()
@@ -548,7 +544,8 @@ def login_data(reconnect, retry=0):
 
     return False
 
-def login_norway(reconnect, retry=0):
+def login_norway():
+    xbmc.log('[login_norway] entering', level=xbmc.LOGDEBUG)
     device_id, tv_client_boot_id, timestamp, sessionid = create_data()
     try:
         # 1)
@@ -572,7 +569,8 @@ def login_norway(reconnect, retry=0):
         }
         response = send_req(url, post=True, headers=headers, params=params, json=payload, verify=True)
         if not response:
-            xbmcgui.Dialog().ok(localized(30012), "%s (1)" % localized(30006))
+            xbmc.log('[login_norway] ERROR part 1: No response\nURL: %s\nResponse: %s' % (url, response), level=xbmc.LOGDEBUG)
+            xbmcgui.Dialog().ok(localized(30012), "%s (no response)" % localized(30006))
             return False
         response = response.json()
         if 'errorMessage' in response.keys():
@@ -581,14 +579,17 @@ def login_norway(reconnect, retry=0):
                 msg = "%s: %s/%s %s" % (msg, localized(30002), localized(30003), localized(30015).lower())
             else:
                 msg = "%s: %s" % (msg, response['errorMessage'])
+            xbmc.log('[login_norway] ERROR part 1: "%s"' % msg, level=xbmc.LOGDEBUG)
             xbmcgui.Dialog().ok(localized(30012), msg)
             return False
         elif "idToken" not in response.keys() or "engagements" not in response.keys() or "engagementId" not in response["engagements"][0].keys():
-            xbmcgui.Dialog().ok(localized(30012), "%s: Unexpected response!\nURL: '%s'\nResponse: %s" % (localized(30007), url, response))
+            msg = "%s: Unexpected response!\nURL: '%s'\nResponse: %s" % (localized(30007), url, response)
+            xbmc.log('[login_norway] ERROR part 1: %s' % msg, level=xbmc.LOGDEBUG)
+            xbmcgui.Dialog().ok(localized(30012), msg)
             return False
         
-        idToken = response["idToken"]
-        engagement_id = response["engagements"][0]["engagementId"]
+        idToken = str(response["idToken"])
+        engagement_id = str(response["engagements"][0]["engagementId"])
         
         # 2)
         url = 'https://logingateway.teliaplay.{cc}/logingateway/rest/v1/get-login/authenticate/selected'.format(cc=cc[country])
@@ -596,29 +597,36 @@ def login_norway(reconnect, retry=0):
             'user-agent':           USER_AGENT,
             'accept':               'application/json',
             'content-type':         'application/json',
-            'tv-client-boot-id':    tv_client_boot_id,
-            'tv-client-name':       'web',
+            #'tv-client-boot-id':    tv_client_boot_id,
+            #'tv-client-name':       'web',
             'x-country':            ca[country],
         }
         params = {
             'redirectUri': 'https://www.teliaplay.{cc}/'.format(cc=cc[country]),
         }
-        engagementIdentifierDto = {"country":"NO", "id":engagement_id, "platform":"OTT"}
         payload = {
-            'engagementIdentifier': engagementIdentifierDto,
-            'token':                idToken,
+            "engagementIdentifier": {
+                "country": "NO",
+                "id": engagement_id,
+                "platform": "OTT"
+            },
+            "idToken":idToken
         }
         response = send_req(url, post=True, headers=headers, params=params, json=payload, verify=True)
         if not response:
-            xbmcgui.Dialog().ok(localized(30012), "%s (2)" % localized(30006))
+            xbmc.log('[login_norway] ERROR part 2: No response\nURL: %s\nResponse: %s' % (url, response), level=xbmc.LOGDEBUG)
+            xbmcgui.Dialog().ok(localized(30012), "%s (no response)" % localized(30006))
             return False
         response = response.json()
         if 'errorMessage' in response.keys():
             msg = "%s: %s" % (localized(30007), response['errorMessage'])
+            xbmc.log('[login_norway] ERROR part 2: "%s"' % msg, level=xbmc.LOGDEBUG)
             xbmcgui.Dialog().ok(localized(30012), msg)
             return False
         elif "redirectUri" not in response.keys() or "teliaplay.{cc}/?code=".format(cc=cc[country]) not in response["redirectUri"]:
-            xbmcgui.Dialog().ok(localized(30012), "%s: Unexpected response!\nURL: '%s'\nResponse: %s" % (localized(30007), url, response))
+            msg = "%s: Unexpected response!\nURL: '%s'\nResponse: %s" % (localized(30007), url, response)
+            xbmc.log('[login_norway] ERROR part 2: %s' % msg, level=xbmc.LOGDEBUG)
+            xbmcgui.Dialog().ok(localized(30012), msg)
             return False
         
         code = response["redirectUri"].split("/?code=")[1]
@@ -635,11 +643,13 @@ def login_norway(reconnect, retry=0):
         }
         response = send_req(url, post=True, headers=headers, verify=True)
         if not response:
-            xbmcgui.Dialog().ok(localized(30012), "%s (3)" % localized(30006))
+            xbmc.log('[login_norway] ERROR part 3: No response\nURL: %s\nResponse: %s' % (url, response), level=xbmc.LOGDEBUG)
+            xbmcgui.Dialog().ok(localized(30012), "%s (no response)" % localized(30006))
             return False
         response = response.json()
         if 'errorMessage' in response.keys():
             msg = "%s: %s" % (localized(30007), response['errorMessage'])
+            xbmc.log('[login_norway] ERROR part 3: "%s"' % msg, level=xbmc.LOGDEBUG)
             xbmcgui.Dialog().ok(localized(30012), msg)
             return False
         
@@ -654,6 +664,7 @@ def login_norway(reconnect, retry=0):
         
         # TODO: What is the following settings variables for?
         # 'teliaplay_cookies', 'teliaplay_usern', 'teliaplay_subtoken'
+        xbmc.log('[login_norway] login ok', level=xbmc.LOGDEBUG)
         return True
     
     except Exception as ex:
