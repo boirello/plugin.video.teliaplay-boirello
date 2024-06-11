@@ -1961,16 +1961,16 @@ def get_stream(exlink, catchup_type):
             headers = {
                 'connection': 'keep-alive',
                 'tv-client-boot-id': tv_client_boot_id,
-                'DNT': '1',
+                #'DNT': '1',
                 'authorization': 'Bearer '+ beartoken,
-                'tv-client-tz': 'Europe/{city}'.format(city=city[country]),
+                #'tv-client-tz': 'Europe/{city}'.format(city=city[country]),
                 'x-country': cc[country],
                 'user-agent': UA,
                 'content-type': 'application/json',
                 'accept': '*/*',
-                'origin': base[country],
-                'referer': base[country]+'/',
-                'accept-language': '{cc},en;q=0.9,{cl};q=0.8,en-US;q=0.7'.format(cc=cc[country], cl=cl[country]),
+                #'origin': base[country],
+                #'referer': base[country]+'/',
+                #'accept-language': '{cc},en;q=0.9,{cl};q=0.8,en-US;q=0.7'.format(cc=cc[country], cl=cl[country]),
             }
 
             params = (
@@ -1983,22 +1983,29 @@ def get_stream(exlink, catchup_type):
                 'watchMode': catchup_type,
                 'accessControl': 'SUBSCRIPTION',
                 'device': {
-                    'deviceId': tv_client_boot_id,
-                    'category': 'desktop_windows',
-                    'packagings': ['DASH_MP4_CTR'],
+                    'deviceId': dashjs,                 # TODO: Strip vekk "WEB-"?
+                    #'category': 'desktop_windows',
+                    #'packagings': ['DASH_MP4_CTR'],
+                    "packagings": ["DASH_MP4_CTR", "HLS_CMAF_CBCS", "HLS_TS_CBCS"],
                     'drmType': 'WIDEVINE',
-                    'capabilities': [],
+                    #'capabilities': [],
+                    "capabilities": ["YOSPACE_DASH", "CHANNEL_DVR", "YOSPACE_VOD"],
                     'screen': {
                         'height': 1080,
-                        'width': 1920
+                        'width': 1920,
                     },
-                    'os': 'Windows',
-                    'model': 'windows_desktop'
+                    "tvClient": {
+                        "name": "web",
+                        "version": "1.135.10",
+                        "os": "Windows",                    # TODO: Gjøre dynamisk?
+                        "osVersion": "NT 10.0",
+                        "vendorModel": "windows_desktop",
+                    },
                 },
 
                 'preferences': {
                     'audioLanguage': ['undefined'],
-                    'accessibility': []
+                    'accessibility': [],
                 }
             }
 
@@ -2010,16 +2017,16 @@ def get_stream(exlink, catchup_type):
             headers = {
                 'Connection': 'keep-alive',
                 'tv-client-boot-id': tv_client_boot_id,
-                'DNT': '1',
+                #'DNT': '1',
                 'Authorization': 'Bearer '+ beartoken,
-                'tv-client-tz': 'Europe/{city}'.format(city=city[country]),
+                #'tv-client-tz': 'Europe/{city}'.format(city=city[country]),
                 'X-Country': cc[country],
                 'User-Agent': UA,
                 'content-type': 'application/json',
                 'Accept': '*/*',
-                'Origin': base[country],
-                'Referer': base[country]+'/',
-                'accept-language': '{cc},en;q=0.9,{cl};q=0.8,en-US;q=0.7'.format(cc=cc[country], cl=cl[country]),
+                #'Origin': base[country],
+                #'Referer': base[country]+'/',
+                #'accept-language': '{cc},en;q=0.9,{cl};q=0.8,en-US;q=0.7'.format(cc=cc[country], cl=cl[country]),
             }
 
             params = (
@@ -2027,27 +2034,34 @@ def get_stream(exlink, catchup_type):
             )
 
             data = {
-                'sessionId': six.text_type(uuid.uuid4()),
+                'sessionId': sessionid,
                 'whiteLabelBrand': 'TELIA',
                 'watchMode': catchup_type,
                 'accessControl': 'SUBSCRIPTION',
                 'device': {
-                    'deviceId': tv_client_boot_id,
+                    'deviceId': dashjs,                 # TODO: Strip vekk "WEB-"?
                     'category': 'desktop_windows',
-                    'packagings': ['DASH_MP4_CTR'],
+                    #'packagings': ['DASH_MP4_CTR'],
+                    "packagings": ["DASH_MP4_CTR", "HLS_CMAF_CBCS", "HLS_TS_CBCS"],
                     'drmType': 'WIDEVINE',
-                    'capabilities': [],
+                    #'capabilities': [],
+                    "capabilities": ["YOSPACE_DASH", "CHANNEL_DVR", "YOSPACE_VOD"],
                     'screen': {
                         'height': 1080,
-                        'width': 1920
+                        'width': 1920,
                     },
-                    'os': 'Windows',
-                    'model': 'windows_desktop'
+                    "tvClient": {
+                        "name": "web",
+                        "version": "1.135.10",
+                        "os": "Windows",                    # TODO: Gjøre dynamisk?
+                        "osVersion": "NT 10.0",
+                        "vendorModel": "windows_desktop",
+                    },
                 },
 
                 'preferences': {
-                    'audioLanguage': [],
-                    'accessibility': []
+                    'audioLanguage': ['undefined'],
+                    'accessibility': [],
                 }
             }
 
