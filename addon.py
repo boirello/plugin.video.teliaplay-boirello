@@ -2825,6 +2825,9 @@ def router(param):
 
         elif mode == 'vod_genre_movies':
             movies = 'movie-corner'
+            # Movies for Norway:
+            if cc[country] == "no":
+                movies = 'movies'
             vod_genre(movies)
 
         elif mode == 'vod_genre_series':
